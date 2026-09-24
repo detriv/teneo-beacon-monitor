@@ -155,3 +155,97 @@ async def test_telegram_notification():
         return {"status": "ok", "message": "Test notification sent to Telegram."}
     else:
         return {"status": "error", "message": "Failed to send Telegram notification. Check logs."}
+
+
+@app.post("/smoke-test")
+async def smoke_test_boost_ready():
+    """
+    Smoke test: simulate cooldownRemaining=0 and verify auto-notification flow.
+    
+    This endpoint:
+    1. Mocks API response with cooldownRemaining=0
+    2. Runs check_and_notify() to verify notification generation
+    3. Optionally sends real Telegram message (if ?send_real=true)
+    4. Returns detailed test results
+    
+    Query params:
+        send_real: bool = False — set true to also send real Telegram message
+    """
+    send_real = False
+    
+    # Check query params
+    from fastapi import Request
+    request = Request
+    # Parse query string manually for simplicity
+    import urllib.parse
+    parsed = urllib.parse.urlparse(str(request.url))
+    params = urllib.parse.parse_qs(parsed.query)
+    if "send_real" in params:
+        send_real = params["send_real"][0].lower() == "true"
+
+    print("\n🧪 Smoke Test: Boost Ready Flow")
+    print("=" * 50)
+
+    # Mock API response: cooldownRemaining=0 (boost ready)
+    mock_api_response = {
+        "fragments": 5965.4,
+        "totalFragments": 5965.4,
+        "escrowFragments": 0,
+        "unclaimedFragments": 30,
+        "beaconPower": 124,
+        "totalBoosts": 2,
+        "consecutiveBoosts": 2,
+        "lastBoostAt": "2026-09-24T12:00:00.000Z",
+        "cooldownRemaining": 0,  # KEY: boost is ready!
+        "earlyBoostFee": 0,
+        "connectedNodes": 1,
+        "fragmentsPerHour": 10,
+        "challengeAvailable": False,
+        "challengeToken": None,
+    }
+
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    # Patch requests.get to return mock response
+    with patch("beacon_service.requests.get") as mock_get:
+        mock_response = MagicMock()
+        mock_response.json.return_value = mock_api_response
+        mock_response.raise_for_status.return_value = None
+        mock_get.return_value = mock_response
+
+        # Run check_and_notify (sync)
+        result = service.check_and_notify()
+
+    cooldown = result["cooldown_remaining"]
+    notification = result["notification"]
+    state = service.load_state()
+
+    test_results = {
+        "test": "boost_ready_flow",
+        "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "mock_api_response": {
+            "cooldownRemaining": 0,
+            "beaconPower": 124,
+            "unclaimedFragments": 30,
+        },
+        "results": {
+            "cooldown_remaining": cooldown,
+            "boost_ready": cooldown <= 0,
+            "notification_generated": notification is not None,
+            "notification_message": notification,
+            "state_saved": state.get("last_notified_cooldown") == "ready",
+        },
+        "status": "pass" if (cooldown <= 0 and notification) else "fail",
+    }
+
+    # Optionally send real Telegram message
+    if send_real and settings.telegram_enabled:
+        telegram_success = await service.send_telegram(notification)
+        test_results["real_telegram_sent"] = telegram_success
+        test_results["telegram_message_id"] = "delivered" if telegram_success else "failed"
+
+    print(f"Status: {test_results['status']}")
+    print(f"Notification: {'generated' if notification else 'none'}")
+    print(f"State: {state.get('last_notified_cooldown')}")
+
+    return test_results
