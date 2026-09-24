@@ -136,7 +136,7 @@ async def get_last_notification():
     return "No notification yet — boost not ready."
 
 
-@app.post("/test-notify")
+@app.api_route("/test-notify", methods=["GET", "POST"])
 async def test_telegram_notification():
     """Send a test notification to Telegram (if configured)."""
     if not settings.telegram_enabled:
