@@ -134,3 +134,24 @@ async def get_last_notification():
     if notify_path.exists():
         return notify_path.read_text()
     return "No notification yet — boost not ready."
+
+
+@app.post("/test-notify")
+async def test_telegram_notification():
+    """Send a test notification to Telegram (if configured)."""
+    if not settings.telegram_enabled:
+        return {"status": "error", "message": "Telegram not enabled. Set TELEGRAM_ENABLED=true."}
+    if not settings.telegram_bot_token or not settings.telegram_chat_id:
+        return {"status": "error", "message": "Telegram bot token or chat ID not set."}
+
+    test_message = (
+        "🧪 Teneo Beacon Monitor — Test Notification\n"
+        "✅ Telegram integration is working!\n"
+        "📊 This is a test message from your FastAPI monitor."
+    )
+
+    success = service.send_telegram(test_message)
+    if success:
+        return {"status": "ok", "message": "Test notification sent to Telegram."}
+    else:
+        return {"status": "error", "message": "Failed to send Telegram notification. Check logs."}
