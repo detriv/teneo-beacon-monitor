@@ -1,11 +1,15 @@
 """Settings management for Teneo Beacon Monitor."""
+import os
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Project root = directory where this config.py lives
+BASE_DIR = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=str(Path.home() / ".config" / "teneo-beacon" / "bot.env"),
+        env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -21,9 +25,10 @@ class Settings(BaseSettings):
     # Monitor
     check_interval_seconds: int = 3600  # 1 hour
 
-    # State
-    state_file: str = str(Path.home() / ".config" / "teneo-beacon" / "boost_state.json")
-    notify_file: str = str(Path.home() / ".config" / "teneo-beacon" / "boost_ready.txt")
+    # State — stored in project's data/ directory (standalone, portable)
+    data_dir: str = str(BASE_DIR / "data")
+    state_file: str = ""  # computed in model_validator
+    notify_file: str = ""  # computed in model_validator
 
     # Telegram
     telegram_bot_token: str = ""
@@ -36,4 +41,13 @@ class Settings(BaseSettings):
 
     # Server
     host: str = "0.0.0.0"
-    port: int = 8765
+    port: int = int(os.getenv("PORT", "8765"))
+
+    def model_post_init(self, __context):
+        # Resolve state/notify files relative to data_dir
+        data_dir = Path(self.data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        if not self.state_file:
+            self.state_file = str(data_dir / "boost_state.json")
+        if not self.notify_file:
+            self.notify_file = str(data_dir / "boost_ready.txt")

@@ -1,10 +1,10 @@
 .venv/
 __pycache__/
 *.pyc
-bot.env
+.env
+data/
 boost_state.json
 boost_ready.txt
 boost_ready.flag
-.env
 *.log
 .DS_Store
