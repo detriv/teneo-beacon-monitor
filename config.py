@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 class Settings(BaseSettings):
+    # Read from FastAPI Cloud env vars or local .env file
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"),
         env_file_encoding="utf-8",
@@ -27,8 +28,8 @@ class Settings(BaseSettings):
 
     # State — stored in project's data/ directory (standalone, portable)
     data_dir: str = str(BASE_DIR / "data")
-    state_file: str = ""  # computed in model_validator
-    notify_file: str = ""  # computed in model_validator
+    state_file: str = ""  # computed in model_post_init
+    notify_file: str = ""  # computed in model_post_init
 
     # Telegram
     telegram_bot_token: str = ""
@@ -39,7 +40,7 @@ class Settings(BaseSettings):
     webhook_url: str = ""
     webhook_enabled: bool = False
 
-    # Server
+    # Server (FastAPI Cloud sets PORT automatically)
     host: str = "0.0.0.0"
     port: int = int(os.getenv("PORT", "8765"))
 
