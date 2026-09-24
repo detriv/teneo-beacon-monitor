@@ -134,13 +134,12 @@ class BeaconService:
             return False
         try:
             bot = Bot(token=self.settings.telegram_bot_token)
-            bot.send_message(
+            response = bot.send_message(
                 chat_id=self.settings.telegram_chat_id,
                 text=message,
-                parse_mode="HTML",
                 disable_web_page_preview=True,
             )
-            log.info("Telegram notification sent to chat %s", self.settings.telegram_chat_id)
+            log.info("Telegram sent: message_id=%s chat=%s", response.message_id, self.settings.telegram_chat_id)
             return True
         except Exception as e:
             log.error("Telegram send failed: %s", e)
