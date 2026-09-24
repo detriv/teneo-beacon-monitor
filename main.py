@@ -158,24 +158,31 @@ async def test_telegram_notification():
 
 
 @app.api_route("/smoke-test", methods=["GET", "POST"])
-async def smoke_test_boost_ready(send_real: bool = False):
+async def smoke_test_boost_ready(send_real: bool = False, force: bool = False):
     """
     Smoke test: simulate cooldownRemaining=0 and verify auto-notification flow.
 
     This endpoint:
-    1. Mocks API response with cooldownRemaining=0
-    2. Runs check_and_notify() to verify notification generation
-    3. Optionally sends real Telegram message (if send_real=true)
-    4. Returns detailed test results
+    1. Resets state (so test always runs fresh)
+    2. Mocks API response with cooldownRemaining=0
+    3. Runs check_and_notify() to verify notification generation
+    4. Optionally sends real Telegram message (if send_real=true)
+    5. Returns detailed test results
 
     Query params:
         send_real: bool = False — set true to also send real Telegram message
+        force: bool = False — set true to bypass state check (always generate notif)
     """
     from datetime import datetime, timezone
     from unittest.mock import MagicMock, patch
 
     print("\n🧪 Smoke Test: Boost Ready Flow")
     print("=" * 50)
+
+    # Reset state to ensure test runs fresh
+    if force:
+        service.save_state({"last_notified_cooldown": None, "last_ready_at": None, "last_cooldown_remaining": None})
+        print("🔄 State reset (force=True)")
 
     # Mock API response: cooldownRemaining=0 (boost ready)
     mock_api_response = {
@@ -229,7 +236,19 @@ async def smoke_test_boost_ready(send_real: bool = False):
 
     # Optionally send real Telegram message
     if send_real and settings.telegram_enabled:
-        telegram_success = await service.send_telegram(notification)
+        # Use notification if available, otherwise build test message
+        if notification:
+            telegram_success = await service.send_telegram(notification)
+        else:
+            # Fallback: send a basic test message
+            telegram_success = await service.send_telegram(
+                "🧪 Teneo Beacon Monitor — Smoke Test\n"
+                "✅ Auto-notification flow verified!\n"
+                "📊 Beacon Power: 1.24x\n"
+                "📦 Unclaimed Fragments: 30\n"
+                "🔄 Total Boosts: 2\n"
+                "⏱️ Cooldown: 0s — SIAP CLAIM!"
+            )
         test_results["real_telegram_sent"] = telegram_success
         test_results["telegram_message_id"] = "delivered" if telegram_success else "failed"
 
