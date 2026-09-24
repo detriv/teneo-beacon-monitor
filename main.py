@@ -157,31 +157,22 @@ async def test_telegram_notification():
         return {"status": "error", "message": "Failed to send Telegram notification. Check logs."}
 
 
-@app.post("/smoke-test")
-async def smoke_test_boost_ready():
+@app.api_route("/smoke-test", methods=["GET", "POST"])
+async def smoke_test_boost_ready(send_real: bool = False):
     """
     Smoke test: simulate cooldownRemaining=0 and verify auto-notification flow.
-    
+
     This endpoint:
     1. Mocks API response with cooldownRemaining=0
     2. Runs check_and_notify() to verify notification generation
-    3. Optionally sends real Telegram message (if ?send_real=true)
+    3. Optionally sends real Telegram message (if send_real=true)
     4. Returns detailed test results
-    
+
     Query params:
         send_real: bool = False — set true to also send real Telegram message
     """
-    send_real = False
-    
-    # Check query params
-    from fastapi import Request
-    request = Request
-    # Parse query string manually for simplicity
-    import urllib.parse
-    parsed = urllib.parse.urlparse(str(request.url))
-    params = urllib.parse.parse_qs(parsed.query)
-    if "send_real" in params:
-        send_real = params["send_real"][0].lower() == "true"
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock, patch
 
     print("\n🧪 Smoke Test: Boost Ready Flow")
     print("=" * 50)
@@ -196,15 +187,13 @@ async def smoke_test_boost_ready():
         "totalBoosts": 2,
         "consecutiveBoosts": 2,
         "lastBoostAt": "2026-09-24T12:00:00.000Z",
-        "cooldownRemaining": 0,  # KEY: boost is ready!
+        "cooldownRemaining": 0,
         "earlyBoostFee": 0,
         "connectedNodes": 1,
         "fragmentsPerHour": 10,
         "challengeAvailable": False,
         "challengeToken": None,
     }
-
-    from unittest.mock import AsyncMock, MagicMock, patch
 
     # Patch requests.get to return mock response
     with patch("beacon_service.requests.get") as mock_get:
@@ -222,7 +211,7 @@ async def smoke_test_boost_ready():
 
     test_results = {
         "test": "boost_ready_flow",
-        "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "mock_api_response": {
             "cooldownRemaining": 0,
             "beaconPower": 124,
