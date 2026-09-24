@@ -150,7 +150,7 @@ async def test_telegram_notification():
         "📊 This is a test message from your FastAPI monitor."
     )
 
-    success = service.send_telegram(test_message)
+    success = await service.send_telegram(test_message)
     if success:
         return {"status": "ok", "message": "Test notification sent to Telegram."}
     else:

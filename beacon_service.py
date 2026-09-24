@@ -128,13 +128,13 @@ class BeaconService:
             log.error("Webhook failed: %s", e)
             return False
 
-    def send_telegram(self, message: str) -> bool:
-        """Send notification to Telegram if configured."""
+    async def send_telegram(self, message: str) -> bool:
+        """Send notification to Telegram if configured (async)."""
         if not self.settings.telegram_enabled or not self.settings.telegram_bot_token or not self.settings.telegram_chat_id:
             return False
         try:
             bot = Bot(token=self.settings.telegram_bot_token)
-            response = bot.send_message(
+            response = await bot.send_message(
                 chat_id=self.settings.telegram_chat_id,
                 text=message,
                 disable_web_page_preview=True,
