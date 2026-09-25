@@ -25,6 +25,7 @@ class BeaconService:
                 "last_notified_cooldown": None,
                 "last_ready_at": None,
                 "last_cooldown_remaining": None,
+                "last_boosts": 0,
             }, indent=2))
 
     def fetch_status(self) -> dict:
@@ -47,7 +48,7 @@ class BeaconService:
         state_path = Path(self.settings.state_file)
         if state_path.exists():
             return json.loads(state_path.read_text())
-        return {"last_notified_cooldown": None}
+        return {"last_notified_cooldown": None, "last_boosts": 0}  # Backward compat
 
     def save_state(self, state: dict):
         state_path = Path(self.settings.state_file)
@@ -87,22 +88,27 @@ class BeaconService:
     def check_and_notify(self) -> dict:
         """
         Fetch status, check cooldown, save state.
-        Returns dict with status, notification (or None), cooldown_remaining.
+        Returns dict with status, notification (or None), cooldown_remaining, boosts.
         """
         status = self.fetch_status()
         cooldown = status.get("cooldownRemaining", 0)
+        total_boosts = status.get("totalBoosts", 0)
         state = self.load_state()
         now_ts = int(time.time())
         notification = None
 
+        last_boosts = state.get("last_boosts", 0)
+
         if cooldown <= 0:
-            if state.get("last_notified_cooldown") != "ready":
+            if total_boosts > last_boosts or state.get("last_notified_cooldown") != "ready":
                 notification = self.format_notification(status)
                 state["last_notified_cooldown"] = "ready"
                 state["last_ready_at"] = now_ts
+                state["last_boosts"] = total_boosts
         else:
             state["last_notified_cooldown"] = "cooling"
             state["last_cooldown_remaining"] = cooldown
+            state["last_boosts"] = total_boosts
 
         self.save_state(state)
 
@@ -110,6 +116,7 @@ class BeaconService:
             "status": status,
             "notification": notification,
             "cooldown_remaining": cooldown,
+            "boosts": total_boosts,
         }
 
     def send_webhook(self, message: str) -> bool:
