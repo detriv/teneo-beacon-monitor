@@ -1,7 +1,8 @@
 """Teneo Beacon Monitor — FastAPI Application."""
 import logging
 from contextlib import asynccontextmanager
-
+import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -18,13 +19,14 @@ logging.basicConfig(
 )
 log = logging.getLogger("teneo-beacon")
 
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
 
 
-def run_monitor_check():
+async def run_monitor_check():
     """Scheduled job: check cooldown, send notification when ready."""
     try:
-        result = service.check_and_notify()
+        # requests bersifat blocking, jadi jalankan di thread
+        result = await asyncio.to_thread(service.check_and_notify)
         status = result["status"]
         cooldown = result["cooldown_remaining"]
 
@@ -40,23 +42,20 @@ def run_monitor_check():
         if result["notification"]:
             log.info("🚀 BOOST READY — sending notification")
             service.write_notify_file(result["notification"])
-            # Send Telegram notification
-            service.send_telegram(result["notification"])
-            # Send webhook if configured
-            if settings.webhook_enabled:
-                service.send_webhook(result["notification"])
 
+            ok = await service.send_telegram(result["notification"])
+            log.info("Telegram sent: %s", ok)
+
+            if settings.webhook_enabled:
+                await asyncio.to_thread(service.send_webhook, result["notification"])
     except Exception as e:
         log.error("Monitor check failed: %s", e)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     log.info("Teneo Beacon Monitor starting — interval: %ds", settings.check_interval_seconds)
-    # Run once immediately on startup
-    run_monitor_check()
-    # Schedule recurring checks
+    await run_monitor_check()          # ← pakai await
     scheduler.add_job(
         run_monitor_check,
         "interval",
@@ -66,7 +65,6 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
     yield
-    # Shutdown
     scheduler.shutdown(wait=False)
 
 
