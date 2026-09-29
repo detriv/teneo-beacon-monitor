@@ -113,10 +113,12 @@ async def get_status():
         raise HTTPException(status_code=502, detail=f"Teneo API error: {str(e)}")
 
 
-@app.post("/check")
+@app.api_route("/check", methods=["GET", "POST"])
 async def trigger_check():
-    """Manually trigger a cooldown check. Returns notification if ready."""
-    result = service.check_and_notify()
+    result = await asyncio.to_thread(service.check_and_notify)
+    if result["notification"]:
+        service.write_notify_file(result["notification"])
+        await service.send_telegram(result["notification"])
     return {
         "cooldownRemaining": result["cooldown_remaining"],
         "boostReady": result["cooldown_remaining"] <= 0,
